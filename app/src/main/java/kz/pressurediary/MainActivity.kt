@@ -169,40 +169,68 @@ private fun mergeComments(oldComment: String, newComment: String): String {
     }
 }
     private fun saveReading() {
-        val s = sysInput.text.toString().replace(',', '.').toDoubleOrNull()
-        val d = diaInput.text.toString().replace(',', '.').toDoubleOrNull()
-        val p = pulseInput.text.toString().replace(',', '.').toDoubleOrNull()
-        if (s == null || d == null || p == null || s <= 0 || d <= 0 || p <= 0) {
-            Toast.makeText(this, "Введите корректные значения давления и пульса", Toast.LENGTH_LONG).show(); return
-        }
-        if (s > 300 || d > 200 || p > 250) {
-            Toast.makeText(this, "Проверьте введённые значения", Toast.LENGTH_LONG).show(); return
-        }
-        val now = LocalDateTime.now()
-        val all = readRecords().toMutableList()
-        val last = all.lastOrNull()
-        val elapsedSeconds = if (last != null) Duration.between(last.dateTime, now).seconds else Long.MAX_VALUE
-        val result: Reading
-        if (last != null && elapsedSeconds in 0..900) {
-            val newCount = last.count + 1
-            result = Reading(
-                last.dateTime,
-                (last.systolic * last.count + s) / newCount,
-                (last.diastolic * last.count + d) / newCount,
-                (last.pulse * last.count + p) / newCount,
-                newCount
-            )
-            all[all.lastIndex] = result
-            rewriteRecords(all)
-        } else {
-            result = Reading(now, s, d, p, 1)
-            appendRecord(result)
-        }
-        sysInput.text.clear(); diaInput.text.clear(); pulseInput.text.clear()
-        val msg = if (result.count > 1) "Замер объединён. Значений в группе: ${result.count}\nСреднее: ${fmt(result.systolic)}/${fmt(result.diastolic)}, пульс ${fmt(result.pulse)}" else "Измерение сохранено"
-        AlertDialog.Builder(this).setTitle("Готово").setMessage(msg).setPositiveButton("OK", null).show()
+    val s = sysInput.text.toString().replace(',', '.').toDoubleOrNull()
+    val d = diaInput.text.toString().replace(',', '.').toDoubleOrNull()
+    val p = pulseInput.text.toString().replace(',', '.').toDoubleOrNull()
+
+    val newComment = commentInput.text.toString()
+        .trim()
+        .replace(';', ',')
+        .replace('\n', ' ')
+        .replace('\r', ' ')
+
+    if (s == null || d == null || p == null || s <= 0 || d <= 0 || p <= 0) {
+        Toast.makeText(this, "Введите корректные значения давления и пульса", Toast.LENGTH_LONG).show()
+        return
     }
 
+    if (s > 300 || d > 200 || p > 250) {
+        Toast.makeText(this, "Проверьте введённые значения", Toast.LENGTH_LONG).show()
+        return
+    }
+
+    val now = LocalDateTime.now()
+    val all = readRecords().toMutableList()
+    val last = all.lastOrNull()
+    val elapsedSeconds = if (last != null) Duration.between(last.dateTime, now).seconds else Long.MAX_VALUE
+
+    val result: Reading
+
+    if (last != null && elapsedSeconds in 0..900) {
+        val newCount = last.count + 1
+
+        result = Reading(
+            last.dateTime,
+            (last.systolic * last.count + s) / newCount,
+            (last.diastolic * last.count + d) / newCount,
+            (last.pulse * last.count + p) / newCount,
+            newCount,
+            mergeComments(last.comment, newComment)
+        )
+
+        all[all.lastIndex] = result
+        rewriteRecords(all)
+    } else {
+        result = Reading(now, s, d, p, 1, newComment)
+        appendRecord(result)
+    }
+
+    sysInput.text.clear()
+    diaInput.text.clear()
+    pulseInput.text.clear()
+    commentInput.text.clear()
+
+    val msg = if (result.count > 1)
+        "Замер объединён. Значений в группе: ${result.count}\nСреднее: ${fmt(result.systolic)}/${fmt(result.diastolic)}, пульс ${fmt(result.pulse)}"
+    else
+        "Измерение сохранено"
+
+    AlertDialog.Builder(this)
+        .setTitle("Готово")
+        .setMessage(msg)
+        .setPositiveButton("OK", null)
+        .show()
+}
     private fun fmt(v: Double) = String.format(Locale.US, "%.1f", v)
 
     private fun csvLine(r: Reading): String = "${r.dateTime.toLocalDate().format(DATE_FMT)};${r.dateTime.toLocalTime().format(TIME_FMT)};${fmt(r.systolic)};${fmt(r.diastolic)};${fmt(r.pulse)};${r.count}"
