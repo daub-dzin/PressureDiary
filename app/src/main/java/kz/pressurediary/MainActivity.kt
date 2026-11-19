@@ -48,6 +48,7 @@ class MainActivity : Activity() {
     private lateinit var sysInput: EditText
     private lateinit var diaInput: EditText
     private lateinit var pulseInput: EditText
+    private lateinit var commentInput: EditText
     private lateinit var timestampLabel: TextView
     private var selectedTab = "input"
     private var chartFrom = LocalDate.now().minusDays(7)
@@ -130,8 +131,26 @@ class MainActivity : Activity() {
         addLabel(c, "Нижнее давление (DIA), мм рт. ст.")
         diaInput = edit(c, "Например, 80")
         addLabel(c, "Пульс, уд/мин")
-        pulseInput = edit(c, "Например, 72")
-        primaryButton(c, "СОХРАНИТЬ ИЗМЕРЕНИЕ") { saveReading() }
+pulseInput = edit(c, "Например, 72")
+
+addLabel(c, "Комментарий (необязательно)")
+commentInput = EditText(this).apply {
+    hint = "Например, после прогулки"
+    textSize = 17f
+    minLines = 2
+    maxLines = 4
+    gravity = Gravity.TOP or Gravity.START
+    inputType = android.text.InputType.TYPE_CLASS_TEXT or
+            android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+            android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+    setPadding(dp(12), dp(8), dp(12), dp(8))
+    setBackgroundColor(Color.WHITE)
+}
+c.addView(commentInput, LinearLayout.LayoutParams(-1, dp(90)).apply {
+    setMargins(0, 0, 0, dp(4))
+})
+
+primaryButton(c, "СОХРАНИТЬ ИЗМЕРЕНИЕ") { saveReading() }
         val info = TextView(this).apply {
             text = "Повторные замеры в течение 15 минут объединяются в одну запись. Время первого замера сохраняется."
             textSize = 13f; setTextColor(Color.DKGRAY); setPadding(0, dp(8), 0, 0)
