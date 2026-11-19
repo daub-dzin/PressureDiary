@@ -38,7 +38,7 @@ private const val CREATE_FILE_REQUEST = 701
     val systolic: Double,
     val diastolic: Double,
     val pulse: Double,
-    val count: Int
+    val count: Int,
     val comment: String
 )
 
@@ -158,7 +158,16 @@ primaryButton(c, "СОХРАНИТЬ ИЗМЕРЕНИЕ") { saveReading() }
         c.addView(info)
         primaryButton(c, "ЭКСПОРТ CSV-ФАЙЛА") { exportCsv() }
     }
+private fun mergeComments(oldComment: String, newComment: String): String {
+    val oldText = oldComment.trim().trimEnd('.')
+    val newText = newComment.trim().trimEnd('.')
 
+    return when {
+        oldText.isEmpty() -> newText
+        newText.isEmpty() -> oldText
+        else -> "$oldText. $newText"
+    }
+}
     private fun saveReading() {
         val s = sysInput.text.toString().replace(',', '.').toDoubleOrNull()
         val d = diaInput.text.toString().replace(',', '.').toDoubleOrNull()
