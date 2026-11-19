@@ -62,7 +62,7 @@ class MainActivity : Activity() {
         if (!recordsFile.exists()) recordsFile.writeText("date;time;systolic;diastolic;pulse;count\n", Charsets.UTF_8)
     }
 
-    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    private fun dp(v: Number) = (v.toFloat() * resources.displayMetrics.density).toInt()
 
     private fun baseScreen(title: String): LinearLayout {
         root = LinearLayout(this).apply {
@@ -101,7 +101,7 @@ class MainActivity : Activity() {
 
     private fun edit(parent: LinearLayout, hint: String, numeric: Boolean = true): EditText {
         val e = EditText(this).apply {
-            this.hint = hint; textSize = 21f; singleLine = true
+            this.hint = hint; textSize = 21f; isSingleLine = true
             inputType = if (numeric) android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL else android.text.InputType.TYPE_CLASS_TEXT
             setPadding(dp(12), dp(8), dp(12), dp(8)); setBackgroundColor(Color.WHITE)
         }
