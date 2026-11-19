@@ -39,6 +39,7 @@ private const val CREATE_FILE_REQUEST = 701
     val diastolic: Double,
     val pulse: Double,
     val count: Int
+    val comment: String
 )
 
 class MainActivity : Activity() {
