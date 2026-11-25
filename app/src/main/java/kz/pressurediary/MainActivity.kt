@@ -40,6 +40,7 @@ private val DISPLAY_FMT: DateTimeFormatter =
     DateTimeFormatter.ofPattern("dd.MM.yyyy  HH:mm", Locale("ru"))
 
 private const val CREATE_FILE_REQUEST = 701
+private const val IMPORT_FILE_REQUEST = 702
 
 data class Reading(
     val dateTime: LocalDateTime,
@@ -363,6 +364,10 @@ class MainActivity : Activity() {
         primaryButton(c, "ЭКСПОРТ CSV-ФАЙЛА") {
             exportCsv()
         }
+
+        primaryButton(c, "ИМПОРТ CSV-ФАЙЛА") {
+            importCsv()
+        }
     }
 
     // Объединение комментариев
@@ -623,6 +628,10 @@ class MainActivity : Activity() {
         primaryButton(c, "ЭКСПОРТ CSV-ФАЙЛА") {
             exportCsv()
         }
+
+        primaryButton(c, "ИМПОРТ CSV-ФАЙЛА") {
+            importCsv()
+        }
     }
 
     // Экран графиков
@@ -657,7 +666,6 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
         }
 
-        // Область графиков теперь прокручивается
         val chartScroll = ScrollView(this).apply {
             isFillViewport = false
         }
@@ -746,6 +754,107 @@ class MainActivity : Activity() {
         draw()
     }
 
+    // Выбор CSV-файла для импорта
+    private fun importCsv() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+        }
+
+        startActivityForResult(intent, IMPORT_FILE_REQUEST)
+    }
+
+    // Чтение импортируемого CSV
+    private fun readImportedCsv(uri: Uri): List<Reading> {
+        val lines = contentResolver.openInputStream(uri)
+            ?.bufferedReader(Charsets.UTF_8)
+            ?.use { it.readLines() }
+            ?: throw Exception("Не удалось открыть файл")
+
+        if (lines.size < 2) {
+            throw Exception("CSV-файл пуст")
+        }
+
+        val records = lines.drop(1)
+            .filter { it.isNotBlank() }
+            .mapNotNull { line ->
+                try {
+                    val a = line.removePrefix("\uFEFF")
+                        .split(';', limit = 7)
+
+                    if (a.size < 6) return@mapNotNull null
+
+                    val comment = if (a.size >= 7) a[6] else ""
+
+                    Reading(
+                        LocalDate.parse(a[0].trim(), DATE_FMT)
+                            .atTime(
+                                java.time.LocalTime.parse(
+                                    a[1].trim(),
+                                    TIME_FMT
+                                )
+                            ),
+                        a[2].trim().replace(',', '.').toDouble(),
+                        a[3].trim().replace(',', '.').toDouble(),
+                        a[4].trim().replace(',', '.').toDouble(),
+                        a[5].trim().toInt().coerceAtLeast(1),
+                        comment
+                    )
+                } catch (_: Exception) {
+                    null
+                }
+            }
+
+        if (records.isEmpty()) {
+            throw Exception("Не удалось найти записи в CSV")
+        }
+
+        return records.sortedBy { it.dateTime }
+    }
+
+    // Подтверждение восстановления истории
+    private fun confirmImport(uri: Uri) {
+        try {
+            val imported = readImportedCsv(uri)
+
+            AlertDialog.Builder(this)
+                .setTitle("Восстановление истории")
+                .setMessage(
+                    "Найдено записей: ${imported.size}\n\n" +
+                    "Текущая история будет заменена импортированными записями. Продолжить?"
+                )
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Восстановить") { _, _ ->
+                    try {
+                        rewriteRecords(imported)
+
+                        Toast.makeText(
+                            this,
+                            "Восстановлено записей: ${imported.size}",
+                            Toast.LENGTH_LONG
+                        ).show()
+
+                        showHistory()
+
+                    } catch (e: Exception) {
+                        Toast.makeText(
+                            this,
+                            "Ошибка восстановления: ${e.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+                .show()
+
+        } catch (e: Exception) {
+            Toast.makeText(
+                this,
+                "Ошибка чтения CSV: ${e.message}",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
     // Экспорт CSV
     private fun exportCsv() {
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
@@ -770,6 +879,18 @@ class MainActivity : Activity() {
         data: Intent?
     ) {
         super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == IMPORT_FILE_REQUEST &&
+            resultCode == RESULT_OK
+        ) {
+            val uri = data?.data
+
+            if (uri != null) {
+                confirmImport(uri)
+            }
+
+            return
+        }
 
         if (requestCode == CREATE_FILE_REQUEST &&
             resultCode == RESULT_OK
