@@ -233,14 +233,22 @@ class MainActivity : Activity() {
     // Настройка автоматического перехода между полями
     private fun setupMeasurementInputs() {
 
+        // Верхнее давление — всегда 3 цифры.
+        // Нижнее давление и пульс:
+        // первая цифра 1 — три цифры, иначе две.
         sysInput.filters = arrayOf(InputFilter.LengthFilter(3))
-        diaInput.filters = arrayOf(InputFilter.LengthFilter(2))
+        diaInput.filters = arrayOf(InputFilter.LengthFilter(3))
         pulseInput.filters = arrayOf(InputFilter.LengthFilter(3))
+
+        fun requiredLength(text: CharSequence?): Int {
+            return if (text?.firstOrNull() == '1') 3 else 2
+        }
 
         fun watcher(
             field: EditText,
             nextField: EditText?,
-            requiredLength: Int
+            fixedLength: Int? = null,
+            moveToSaveButton: Boolean = false
         ) {
             field.addTextChangedListener(object : TextWatcher {
 
@@ -257,23 +265,42 @@ class MainActivity : Activity() {
                     before: Int,
                     count: Int
                 ) {
-                    if (s != null &&
-                        s.length >= requiredLength &&
-                        nextField != null
-                    ) {
-                        nextField.requestFocus()
-                    }
+                    val currentText = s ?: ""
+                    val needed = fixedLength ?: requiredLength(currentText)
 
+                    // Сначала обновляем доступность кнопки,
+                    // затем переводим на неё фокус.
                     updateSaveButton()
+
+                    if (currentText.length == needed) {
+                        if (moveToSaveButton) {
+                            saveButton.requestFocus()
+                        } else {
+                            nextField?.requestFocus()
+                        }
+                    }
                 }
 
                 override fun afterTextChanged(s: Editable?) {}
             })
         }
 
-        watcher(sysInput, diaInput, 3)
-        watcher(diaInput, pulseInput, 2)
-        watcher(pulseInput, null, 2)
+        // Верхнее давление: 3 цифры
+        watcher(sysInput, diaInput, fixedLength = 3)
+
+        // Нижнее давление: 2 или 3 цифры
+        watcher(diaInput, pulseInput)
+
+        // Пульс: 2 или 3 цифры, затем кнопка сохранения
+        watcher(
+            pulseInput,
+            null,
+            moveToSaveButton = true
+        )
+
+        // Разрешаем кнопке принимать фокус
+        saveButton.isFocusable = true
+        saveButton.isFocusableInTouchMode = true
 
         updateSaveButton()
     }
@@ -282,14 +309,24 @@ class MainActivity : Activity() {
     private fun updateSaveButton() {
         if (!::saveButton.isInitialized) return
 
-        val sys = sysInput.text.toString().toIntOrNull()
-        val dia = diaInput.text.toString().toIntOrNull()
-        val pulse = pulseInput.text.toString().toIntOrNull()
+        val sysText = sysInput.text.toString()
+        val diaText = diaInput.text.toString()
+        val pulseText = pulseInput.text.toString()
+
+        val sys = sysText.toIntOrNull()
+        val dia = diaText.toIntOrNull()
+        val pulse = pulseText.toIntOrNull()
+
+        val diaLength =
+            if (diaText.firstOrNull() == '1') 3 else 2
+
+        val pulseLength =
+            if (pulseText.firstOrNull() == '1') 3 else 2
 
         saveButton.isEnabled =
-            sysInput.text.length == 3 &&
-            diaInput.text.length == 2 &&
-            pulseInput.text.length >= 2 &&
+            sysText.length == 3 &&
+            diaText.length == diaLength &&
+            pulseText.length == pulseLength &&
             sys != null &&
             dia != null &&
             pulse != null
