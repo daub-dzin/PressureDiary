@@ -11,6 +11,9 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
+import android.text.Editable
+import android.text.InputFilter
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -59,6 +62,7 @@ class MainActivity : Activity() {
     private lateinit var pulseInput: EditText
     private lateinit var commentInput: EditText
     private lateinit var timestampLabel: TextView
+    private lateinit var saveButton: Button
 
     private var selectedTab = "input"
     private var chartFrom = LocalDate.now().minusDays(7)
@@ -184,8 +188,7 @@ class MainActivity : Activity() {
             isSingleLine = true
 
             inputType = if (numeric) {
-                android.text.InputType.TYPE_CLASS_NUMBER or
-                    android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                android.text.InputType.TYPE_CLASS_NUMBER
             } else {
                 android.text.InputType.TYPE_CLASS_TEXT
             }
@@ -208,18 +211,87 @@ class MainActivity : Activity() {
         parent: LinearLayout,
         text: String,
         action: () -> Unit
-    ) {
+    ): Button {
+        val button = Button(this).apply {
+            this.text = text
+            textSize = 16f
+            isAllCaps = false
+            setOnClickListener { action() }
+        }
+
         parent.addView(
-            Button(this).apply {
-                this.text = text
-                textSize = 16f
-                isAllCaps = false
-                setOnClickListener { action() }
-            },
+            button,
             LinearLayout.LayoutParams(-1, dp(54)).apply {
                 setMargins(0, dp(14), 0, dp(6))
             }
         )
+
+        return button
+    }
+
+    // Настройка автоматического перехода между полями
+    private fun setupMeasurementInputs() {
+
+        sysInput.filters = arrayOf(InputFilter.LengthFilter(3))
+        diaInput.filters = arrayOf(InputFilter.LengthFilter(2))
+        pulseInput.filters = arrayOf(InputFilter.LengthFilter(3))
+
+        fun watcher(
+            field: EditText,
+            nextField: EditText?,
+            requiredLength: Int
+        ) {
+            field.addTextChangedListener(object : TextWatcher {
+
+                override fun beforeTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    count: Int,
+                    after: Int
+                ) {}
+
+                override fun onTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    before: Int,
+                    count: Int
+                ) {
+                    if (s != null &&
+                        s.length >= requiredLength &&
+                        nextField != null
+                    ) {
+                        nextField.requestFocus()
+                    }
+
+                    updateSaveButton()
+                }
+
+                override fun afterTextChanged(s: Editable?) {}
+            })
+        }
+
+        watcher(sysInput, diaInput, 3)
+        watcher(diaInput, pulseInput, 2)
+        watcher(pulseInput, null, 2)
+
+        updateSaveButton()
+    }
+
+    // Проверка заполнения полей
+    private fun updateSaveButton() {
+        if (!::saveButton.isInitialized) return
+
+        val sys = sysInput.text.toString().toIntOrNull()
+        val dia = diaInput.text.toString().toIntOrNull()
+        val pulse = pulseInput.text.toString().toIntOrNull()
+
+        saveButton.isEnabled =
+            sysInput.text.length == 3 &&
+            diaInput.text.length == 2 &&
+            pulseInput.text.length >= 2 &&
+            sys != null &&
+            dia != null &&
+            pulse != null
     }
 
     // Экран ввода измерений
@@ -271,9 +343,13 @@ class MainActivity : Activity() {
             }
         )
 
-        primaryButton(c, "СОХРАНИТЬ ИЗМЕРЕНИЕ") {
+        saveButton = primaryButton(c, "СОХРАНИТЬ ИЗМЕРЕНИЕ") {
             saveReading()
         }
+
+        saveButton.isEnabled = false
+
+        setupMeasurementInputs()
 
         val info = TextView(this).apply {
             text = "Повторные замеры в течение 15 минут объединяются в одну запись. Время первого замера сохраняется."
@@ -386,6 +462,8 @@ class MainActivity : Activity() {
         diaInput.text.clear()
         pulseInput.text.clear()
         commentInput.text.clear()
+
+        sysInput.requestFocus()
 
         val msg =
             if (result.count > 1) {
@@ -579,8 +657,15 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
         }
 
+        // Область графиков теперь прокручивается
+        val chartScroll = ScrollView(this).apply {
+            isFillViewport = false
+        }
+
+        chartScroll.addView(chartHolder)
+
         c.addView(
-            chartHolder,
+            chartScroll,
             LinearLayout.LayoutParams(-1, 0, 1f)
         )
 
